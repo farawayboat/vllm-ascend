@@ -860,6 +860,8 @@ class AscendAttentionBackendImpl(AttentionImpl):
                         self.seq_lens_tensor_cpu = torch.from_numpy(
                             np.array(attn_metadata.prefill_metadata.seq_lens).
                             astype(np.int32))
+                        if is_310p():
+                            mask = torch_npu.npu_format_cast(mask.contiguous(), ACL_FORMAT_FRACTAL_NZ)
                         torch_npu._npu_flash_attention(
                             query=query,
                             key=key,

@@ -25,7 +25,7 @@ import vllm_ascend.envs as envs
 
 # 310P3 202, 910B4 224
 SOC_VERSION = None
-SOC_VERSION_310P = 202
+SOC_VERSION_INFERENCE_SERIES = ["Ascend310P3"]
 
 ACL_FORMAT_FRACTAL_ND = 2
 ACL_FORMAT_FRACTAL_NZ = 29
@@ -33,9 +33,8 @@ ACL_FORMAT_FRACTAL_NZ = 29
 def is_310p():
     global SOC_VERSION
     if SOC_VERSION is None:
-        torch.npu.get_device_name()
-        SOC_VERSION = torch_npu._C._npu_get_soc_version()
-    return SOC_VERSION == SOC_VERSION_310P
+        SOC_VERSION = torch.npu.get_device_name()
+    return SOC_VERSION in SOC_VERSION_INFERENCE_SERIES
 
 
 class NullHandle:
@@ -97,6 +96,7 @@ def communication_adaptation_310p():
             return None
 
     torch.distributed.broadcast = broadcast310p
+    torch.distributed.distributed_c10d.broadcast = broadcast310p
 
     def all_reduce_wrapper_310p(fn):
 
@@ -128,6 +128,9 @@ def communication_adaptation_310p():
     torch.distributed.all_reduce = all_reduce_wrapper_310p(
         torch.distributed.all_reduce
     )
+    torch.distributed.distributed_c10d.all_reduce = all_reduce_wrapper_310p(
+        torch.distributed.distributed_c10d.all_reduce
+    )
 
     def reduce_scatter_310p(output_tensor, input_tensor, group=None):
         rank = torch.distributed.get_rank(group)
@@ -139,6 +142,7 @@ def communication_adaptation_310p():
         output_tensor[:] = input_tensor[rank * interval : (rank + 1) * interval]
 
     torch.distributed._reduce_scatter_base = reduce_scatter_310p
+    torch.distributed.distributed_c10d._reduce_scatter_base = reduce_scatter_310p
 
 
 def try_register_lib(lib_name: str, lib_info: str = ""):
